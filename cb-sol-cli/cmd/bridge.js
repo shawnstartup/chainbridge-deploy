@@ -1,8 +1,8 @@
 const ethers = require('ethers');
 const constants = require('../constants');
 
-const {Command} = require('commander');
-const {setupParentArgs, getFunctionBytes, waitForTx, log} = require("./utils")
+const { Command } = require('commander');
+const { setupParentArgs, getFunctionBytes, waitForTx, log } = require("./utils")
 
 const EMPTY_SIG = "0x00000000"
 
@@ -16,8 +16,8 @@ const registerResourceCmd = new Command("register-resource")
         await setupParentArgs(args, args.parent.parent)
 
         const bridgeInstance = new ethers.Contract(args.bridge, constants.ContractABIs.Bridge.abi, args.wallet);
-        log(args,`Registering contract ${args.targetContract} with resource ID ${args.resourceId} on handler ${args.handler}`);
-        const tx = await bridgeInstance.adminSetResource(args.handler, args.resourceId, args.targetContract, { gasPrice: args.gasPrice, gasLimit: args.gasLimit});
+        log(args, `Registering contract ${args.targetContract} with resource ID ${args.resourceId} on handler ${args.handler}`);
+        const tx = await bridgeInstance.adminSetResource(args.handler, args.resourceId, args.targetContract, { gasPrice: args.gasPrice, gasLimit: args.gasLimit });
         await waitForTx(args.provider, tx.hash)
     })
 
@@ -30,7 +30,7 @@ const registerGenericResourceCmd = new Command("register-generic-resource")
     .option('--deposit <string>', "Deposit function signature", EMPTY_SIG)
     .option('--execute <string>', "Execute proposal function signature", EMPTY_SIG)
     .option('--hash', "Treat signature inputs as function prototype strings, hash and take the first 4 bytes", false)
-    .action(async function(args) {
+    .action(async function (args) {
         await setupParentArgs(args, args.parent.parent)
 
         const bridgeInstance = new ethers.Contract(args.bridge, constants.ContractABIs.Bridge.abi, args.wallet);
@@ -40,8 +40,8 @@ const registerGenericResourceCmd = new Command("register-generic-resource")
             args.execute = getFunctionBytes(args.execute)
         }
 
-        log(args,`Registering generic resource ID ${args.resourceId} with contract ${args.targetContract} on handler ${args.handler}`)
-        const tx = await bridgeInstance.adminSetGenericResource(args.handler, args.resourceId, args.targetContract, args.deposit, args.execute, { gasPrice: args.gasPrice, gasLimit: args.gasLimit})
+        log(args, `Registering generic resource ID ${args.resourceId} with contract ${args.targetContract} on handler ${args.handler}`)
+        const tx = await bridgeInstance.adminSetGenericResource(args.handler, args.resourceId, args.targetContract, args.deposit, args.execute, { gasPrice: args.gasPrice, gasLimit: args.gasLimit })
         await waitForTx(args.provider, tx.hash)
     })
 
@@ -54,10 +54,25 @@ const setBurnCmd = new Command("set-burn")
         await setupParentArgs(args, args.parent.parent)
         const bridgeInstance = new ethers.Contract(args.bridge, constants.ContractABIs.Bridge.abi, args.wallet);
 
-        log(args,`Setting contract ${args.tokenContract} as burnable on handler ${args.handler}`);
-        const tx = await bridgeInstance.adminSetBurnable(args.handler, args.tokenContract, { gasPrice: args.gasPrice, gasLimit: args.gasLimit});
+        log(args, `Setting contract ${args.tokenContract} as burnable on handler ${args.handler}`);
+        const tx = await bridgeInstance.adminSetBurnable(args.handler, args.tokenContract, { gasPrice: args.gasPrice, gasLimit: args.gasLimit });
         await waitForTx(args.provider, tx.hash)
     })
+
+const setVaultCmd = new Command("set-vault")
+    .description("Set vault wallet address in a handler")
+    .option('--bridge <address>', 'Bridge contract address', constants.BRIDGE_ADDRESS)
+    .option('--handler <address>', 'ERC20 handler contract address', constants.ERC20_HANDLER_ADDRESS)
+    .option('--vault <address>', `Address to be set as vault`, constants.ERC20_ADDRESS)
+    .action(async function (args) {
+        await setupParentArgs(args, args.parent.parent)
+        const bridgeInstance = new ethers.Contract(args.bridge, constants.ContractABIs.Bridge.abi, args.wallet);
+
+        log(args, `Setting vault address to ${args.vault} on handler ${args.handler}`);
+        const tx = await bridgeInstance.adminSetVault(args.handler, args.vault, { gasPrice: args.gasPrice, gasLimit: args.gasLimit });
+        await waitForTx(args.provider, tx.hash)
+    })
+
 
 const cancelProposalCmd = new Command("cancel-proposal")
     .description("Cancel a proposal that has passed the expiry threshold")
@@ -92,7 +107,7 @@ const queryResourceId = new Command("query-resource")
     .description("Query the contract address associated with a resource ID")
     .option('--handler <address>', 'Handler contract address', constants.ERC20_HANDLER_ADDRESS)
     .option('--resourceId <address>', `ResourceID to query`, constants.ERC20_RESOURCEID)
-    .action(async function(args) {
+    .action(async function (args) {
         await setupParentArgs(args, args.parent.parent)
 
         const handlerInstance = new ethers.Contract(args.handler, constants.ContractABIs.HandlerHelpers.abi, args.wallet)
@@ -100,14 +115,31 @@ const queryResourceId = new Command("query-resource")
         log(args, `Resource ID ${args.resourceId} is mapped to contract ${address}`)
     })
 
+const queryDeposit = new Command("query-deposit")
+    .description("Query the contract address associated with a resource ID")
+    .option('--bridge <address>', 'Bridge contract address', constants.BRIDGE_ADDRESS)
+    .option('--chainId <id>', 'Destination chain ID', 0)
+    .option('--depositNonce <address>', `Deposit nonce of proposal`, 0)
+    .action(async function (args) {
+        await setupParentArgs(args, args.parent.parent)
+
+        const bridgeInstance = new ethers.Contract(args.bridge, constants.ContractABIs.Bridge.abi, args.wallet);
+        const depositRecord = await bridgeInstance._depositRecords(args.depositNonce, args.chainId)
+        log(args, `depositRecord is ${depositRecord}`)
+    })
+
+
 
 const bridgeCmd = new Command("bridge")
 
 bridgeCmd.addCommand(registerResourceCmd)
 bridgeCmd.addCommand(registerGenericResourceCmd)
 bridgeCmd.addCommand(setBurnCmd)
+bridgeCmd.addCommand(setVaultCmd)
 bridgeCmd.addCommand(cancelProposalCmd)
 bridgeCmd.addCommand(queryProposalCmd)
 bridgeCmd.addCommand(queryResourceId)
+bridgeCmd.addCommand(queryDeposit)
+
 
 module.exports = bridgeCmd
